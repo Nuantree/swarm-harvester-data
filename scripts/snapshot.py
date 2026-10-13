@@ -36,7 +36,12 @@ def write(path, obj):
 
 
 def main():
-    launches = get(f"{API}/launches?limit=500")["launches"]
+    try:
+        launches = get(f"{API}/launches?limit=500")["launches"]
+    except Exception as e:
+        # A brief IMD outage: keep the last snapshot and try again next hour.
+        print(f"launch list unavailable, keeping the previous snapshot: {e}")
+        return
     live = [
         l for l in launches
         if l["status"] == "live" and l["chainId"] == CHAIN_ID
@@ -48,7 +53,11 @@ def main():
         path = os.path.join(trees_dir, l["id"] + ".json")
         if os.path.exists(path):
             continue
-        full = get(f"{API}/launches/{l['id']}?claims=1")
+        try:
+            full = get(f"{API}/launches/{l['id']}?claims=1")
+        except Exception as e:
+            print(f"skipping {l['id']} until next run: {e}")
+            continue
         claims = full.get("claims") or {}
         if not claims.get("root") or not claims.get("leaves"):
             continue  # tree not published yet; try again next run
